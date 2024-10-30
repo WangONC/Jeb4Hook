@@ -93,30 +93,25 @@ class Jeb4xposed(IScript):
                 if param_type in ['int', 'boolean', 'char', 'byte', 'float', 'double', 'long', 'short']:
                     param_type_class = param_type + '.class'
                 else:
-                    param_type_class = 'Class.forName("%s")' % param_type
+                    param_type_class = 'XposedHelpers.findClass("%s", lpparam.classLoader)' % param_type
                 method_param_types.append(param_type_class)
 
             args_list = ['"%s"' % class_name, 'lpparam.classLoader', '"%s"' % method_name]
             args_list.extend(method_param_types)
             args_code = ', '.join(args_list)
 
-            xposed_hook += u"""
-try {
-    XposedHelpers.findAndHookMethod({args_code}, new XC_MethodHook() {{
-        @Override
-        protected void beforeHookedMethod(MethodHookParam param) throws Throwable {{
-            super.beforeHookedMethod(param);
-            // Your code here
-        }}
-        @Override
-        protected void afterHookedMethod(MethodHookParam param) throws Throwable {{
-            super.afterHookedMethod(param);
-            // Your code here
-        }}
-    }});
-} catch (ClassNotFoundException e) {
-    throw new RuntimeException(e);
-}""".format(args_code=args_code)
+            xposed_hook += u"""XposedHelpers.findAndHookMethod({args_code}, new XC_MethodHook() {{
+    @Override
+    protected void beforeHookedMethod(MethodHookParam param) throws Throwable {{
+        super.beforeHookedMethod(param);
+        // Your code here
+    }}
+    @Override
+    protected void afterHookedMethod(MethodHookParam param) throws Throwable {{
+        super.afterHookedMethod(param);
+        // Your code here
+    }}
+}});""".format(args_code=args_code)
 
         return xposed_hook
 
