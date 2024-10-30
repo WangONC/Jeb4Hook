@@ -104,10 +104,12 @@ class Jeb4xposed(IScript):
 XposedHelpers.findAndHookMethod({args_code}, new XC_MethodHook() {{
     @Override
     protected void beforeHookedMethod(MethodHookParam param) throws Throwable {{
+        super.beforeHookedMethod(param);
         // Your code here
     }}
     @Override
     protected void afterHookedMethod(MethodHookParam param) throws Throwable {{
+        super.afterHookedMethod(param);
         // Your code here
     }}
 }});""".format(args_code=args_code)
