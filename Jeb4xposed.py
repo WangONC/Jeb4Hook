@@ -101,18 +101,22 @@ class Jeb4xposed(IScript):
             args_code = ', '.join(args_list)
 
             xposed_hook += u"""
-XposedHelpers.findAndHookMethod({args_code}, new XC_MethodHook() {{
-    @Override
-    protected void beforeHookedMethod(MethodHookParam param) throws Throwable {{
-        super.beforeHookedMethod(param);
-        // Your code here
-    }}
-    @Override
-    protected void afterHookedMethod(MethodHookParam param) throws Throwable {{
-        super.afterHookedMethod(param);
-        // Your code here
-    }}
-}});""".format(args_code=args_code)
+try {
+    XposedHelpers.findAndHookMethod({args_code}, new XC_MethodHook() {{
+        @Override
+        protected void beforeHookedMethod(MethodHookParam param) throws Throwable {{
+            super.beforeHookedMethod(param);
+            // Your code here
+        }}
+        @Override
+        protected void afterHookedMethod(MethodHookParam param) throws Throwable {{
+            super.afterHookedMethod(param);
+            // Your code here
+        }}
+    }});
+} catch (ClassNotFoundException e) {
+    throw new RuntimeException(e);
+}""".format(args_code=args_code)
 
         return xposed_hook
 
