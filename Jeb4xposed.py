@@ -3,8 +3,8 @@
 #?shortcut= alt+x
 
 from com.pnfsoftware.jeb.client.api import IScript, IGraphicalClientContext
-from com.pnfsoftware.jeb.core.units.code.android import IDexUnit, IApkUnit
-from com.pnfsoftware.jeb.core.units.code.java import IJavaSourceUnit, IJavaMethod
+from com.pnfsoftware.jeb.core.units.code.android import IDexUnit
+from com.pnfsoftware.jeb.core.units.code.java import IJavaSourceUnit
 import re
 
 """
@@ -27,6 +27,7 @@ class Jeb4xposed(IScript):
             self.handle_java_dex(ctx, dexdec)
             return
 
+        print(u"❌ Unsupported unit type.")
         return 
 
     def handle_java_dex(self, ctx, dexdec):
@@ -43,7 +44,7 @@ class Jeb4xposed(IScript):
         else:
             java_methods = java_class.getMethods()
         
-        print(u"🔥 Here\'s a fresh Xposed hook...")
+        print(u"🔥 Here's a fresh Xposed hook...")
         print('-' * 100)
         print(self.gen_how_to(ctx))
         print(self.gen_java_hook(java_class, java_methods))
@@ -60,19 +61,22 @@ class Jeb4xposed(IScript):
             'S': "short",
             'J': "long",
             'V': "void",
-            'L': dalvik_name[1:-1],
-            '[': dalvik_name
+            '[': dalvik_name  # Arrays
         }
-        return type_name.get(dalvik_name[0], "unknown")
-    
+        if dalvik_name.startswith('L') and dalvik_name.endswith(';'):
+            return dalvik_name[1:-1]  # Object types
+        return type_name.get(dalvik_name[0], dalvik_name)
+
     def gen_java_hook(self, java_class, java_methods):
         class_name = java_class.getType().toString()
         xposed_hook = ""
 
         for idx, java_method in enumerate(java_methods):
             method_name = java_method.getName().strip('<>')
+            is_constructor = False
             if method_name in ("<init>", "init"):
-                method_name = "constructor"
+                method_name = "$init"
+                is_constructor = True
             if method_name == "<clinit>":
                 print(u"//❌ Encountered <clinit>, skipping...\n//\tPS: Send PR if you know how to fix this.")
                 continue
@@ -93,27 +97,77 @@ class Jeb4xposed(IScript):
                 if param_type in ['int', 'boolean', 'char', 'byte', 'float', 'double', 'long', 'short']:
                     param_type_class = param_type + '.class'
                 else:
+                    # Use XposedHelpers.findClass for third-party classes
                     param_type_class = 'XposedHelpers.findClass("%s", lpparam.classLoader)' % param_type
                 method_param_types.append(param_type_class)
 
-            args_list = ['"%s"' % class_name, 'lpparam.classLoader', '"%s"' % method_name]
+            args_list = ['"%s"' % class_name, 'lpparam.classLoader']
+            if not is_constructor:
+                args_list.append('"%s"' % method_name)
             args_list.extend(method_param_types)
             args_code = ', '.join(args_list)
 
-            xposed_hook += u"""XposedHelpers.findAndHookMethod({args_code}, new XC_MethodHook() {{
+            # Choose the appropriate hook method
+            if is_constructor:
+                hook_method = 'findAndHookConstructor'
+            else:
+                hook_method = 'findAndHookMethod'
+
+            # Generate code for method replacement and logging
+            xposed_hook += u"""\
+// Hooking {class_name}.{method_name}
+// TODO: If replacement is not required, delete this function.
+XposedHelpers.{hook_method}({args_code}, new XC_MethodReplacement() {{
+    @Override
+    protected Object replaceHookedMethod(MethodHookParam param) throws Throwable {{
+        Log.d("JEB4XPOSED", "Method {class_name}.{method_name} is hooked.");
+        // Original method parameters
+{params_code}
+        // TODO: Implement method replacement logic here
+        // Example: Return a default value or modify parameters
+        return null; // Replace with desired return value
+    }}
+}});
+
+// Alternatively, use XC_MethodHook for before and after logic
+XposedHelpers.{hook_method}({args_code}, new XC_MethodHook() {{
     @Override
     protected void beforeHookedMethod(MethodHookParam param) throws Throwable {{
-        super.beforeHookedMethod(param);
-        // Your code here
+        Log.d("JEB4XPOSED", "Before method {class_name}.{method_name} is called.");
+        // Log or modify parameters
+{params_logging_code}
     }}
     @Override
     protected void afterHookedMethod(MethodHookParam param) throws Throwable {{
-        super.afterHookedMethod(param);
-        // Your code here
+        Log.d("JEB4XPOSED", "After method {class_name}.{method_name} is called.");
+        // Log or modify return value
+        Object result = param.getResult();
+        Log.d("JEB4XPOSED", "Return value: " + result);
+        // param.setResult(modifiedResult); // Modify return value if needed
     }}
-}});""".format(args_code=args_code)
+}});""".format(
+                hook_method=hook_method,
+                args_code=args_code,
+                class_name=class_name,
+                method_name=method_name,
+                params_code=self.generate_params_code(method_arguments),
+                params_logging_code=self.generate_params_logging_code(method_arguments)
+            )
 
         return xposed_hook
+
+    def generate_params_code(self, method_arguments):
+        code = ""
+        for idx, arg_name in enumerate(method_arguments):
+            code += "        Object {0} = param.args[{1}];\n".format(arg_name, idx)
+        return code
+
+    def generate_params_logging_code(self, method_arguments):
+        code = ""
+        for idx, arg_name in enumerate(method_arguments):
+            code += "        Object {0} = param.args[{1}];\n".format(arg_name, idx)
+            code += "        Log.d(\"JEB4XPOSED\", \"Parameter {0}: \" + {0});\n".format(arg_name)
+        return code
 
     def gen_how_to(self, ctx):
         return u"// Insert this code into your Xposed module's handleLoadPackage method."
