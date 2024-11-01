@@ -125,7 +125,7 @@ class Jeb4frida_ts(IScript):
             frida_hook += u"""
 var {method_name_var} = {class_name_var}.{method_name}.overload({method_overload});
 {method_name_var}.implementation = function({method_arguments_with_types}) {{
-    console.log(`Hooked {class_name}.{method_name}({method_arguments})`);
+    console.log(`Hooked {class_name}.{method_name}({method_arguments}) -> ({method_arguments_values})`);
     var retval = {method_name_var}.call(this{args_passing});
     return retval;
 }};""".format(
@@ -136,6 +136,7 @@ var {method_name_var} = {class_name_var}.{method_name}.overload({method_overload
         method_overload=', '.join(method_overload_parameters),
         method_arguments_with_types=method_arguments_with_types,
         method_arguments=', '.join(method_arguments),
+        method_arguments_values = '${' + '}, ${'.join(method_arguments) + '}',
         args_passing=args_passing)
 
         return frida_hook
@@ -205,7 +206,7 @@ var interval = setInterval(function() {{
             onEnter: function(args) {{
 {func_args}            }},
             onLeave: function(retval) {{ // return type: {func_retval_type}
-                console.log(`[+] Hooked {lib_name}[{method_real_name}]() -> ${{retval}}`);
+                console.log(`Hooked {lib_name}[{method_real_name}]() -> ${{retval}}`);
                 // You can modify the return value here
             }}
         }});
