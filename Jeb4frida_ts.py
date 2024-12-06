@@ -122,10 +122,17 @@ class Jeb4frida_ts(IScript):
 
             args_passing = ', ' + ', '.join(method_arguments) if method_arguments else ''
 
+            # 修改这里：添加参数值字符串的条件判断
+            method_arguments_values = ''
+            if method_arguments:
+                method_arguments_values = ' -> (${' + '}, ${'.join(method_arguments) + '})'
+            else:
+                method_arguments_values = ' -> ()'
+
             frida_hook += u"""
 var {method_name_var} = {class_name_var}.{method_name}.overload({method_overload});
 {method_name_var}.implementation = function({method_arguments_with_types}) {{
-    console.log(`Hooked {class_name}.{method_name}({method_arguments}) -> ({method_arguments_values})`);
+    console.log(`Hooked {class_name}.{method_name}({method_arguments}){method_arguments_values}`);
     var retval = {method_name_var}.call(this{args_passing});
     return retval;
 }};""".format(
@@ -136,7 +143,7 @@ var {method_name_var} = {class_name_var}.{method_name}.overload({method_overload
         method_overload=', '.join(method_overload_parameters),
         method_arguments_with_types=method_arguments_with_types,
         method_arguments=', '.join(method_arguments),
-        method_arguments_values = '${' + '}, ${'.join(method_arguments) + '}',
+        method_arguments_values=method_arguments_values,
         args_passing=args_passing)
 
         return frida_hook
